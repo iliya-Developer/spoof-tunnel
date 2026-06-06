@@ -120,6 +120,15 @@ function EditContent() {
 
   const update = (key: string, value: any) => setConfig({ ...config, [key]: value });
 
+  const handleAutoStart = async (enabled: boolean) => {
+    try {
+      await api.instanceAutoStart(id, enabled);
+      setConfig({ ...config, enabled });
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   if (!config) return <div style={{ color: "var(--text-secondary)" }}>Loading...</div>;
 
   const isLocal = config.mode === "local";
@@ -203,6 +212,20 @@ function EditContent() {
                     <option value="local">Local (Client)</option>
                     <option value="remote">Remote (Server)</option>
                   </select>
+                </div>
+                <div>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: config.enabled ? "var(--success)" : "var(--text-secondary)", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={config.enabled}
+                      onChange={e => handleAutoStart(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "var(--success)", cursor: "pointer" }}
+                    />
+                    <span style={{ fontWeight: 600, color: "var(--accent)" }}>AutoStart</span>
+                    <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 400 }}>
+                      — Automatically start this tunnel when the panel restarts
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { api, setToken } from "@/lib/api";
+import { getBasePath } from "@/lib/basepath";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -16,8 +17,7 @@ export default function LoginPage() {
       const data = await api.login(username, password);
       setToken(data.token);
       // Redirect to dashboard under the web path
-      const parts = window.location.pathname.split('/').filter(Boolean);
-      const base = (parts.length > 0 && parts[0] !== 'login') ? '/' + parts[0] : '';
+      const base = getBasePath();
       window.location.href = base + "/dashboard";
     } catch (err: any) {
       setError(err.message || "Login failed");

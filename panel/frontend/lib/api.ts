@@ -5,7 +5,6 @@ function getApiBase(): string {
   const base = getBasePath();
   return `${window.location.origin}${base}/api`;
 }
-const API_BASE = getApiBase();
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -28,11 +27,17 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  // Use dynamic API base so it always reflects the current web-path
+  const apiBase = getApiBase();
+  const res = await fetch(`${apiBase}${path}`, { ...options, headers });
   
   if (res.status === 401) {
     clearToken();
-    if (typeof window !== 'undefined') window.location.href = '/login';
+    if (typeof window !== 'undefined') {
+      // Redirect to login WITH the web-path prefix preserved
+      const base = getBasePath();
+      window.location.href = base + '/login';
+    }
     throw new Error('Unauthorized');
   }
   
@@ -65,6 +70,8 @@ export const api = {
   instanceStart: (id: number) => request(`/instances/${id}/start`, { method: 'POST' }),
   instanceStop: (id: number) => request(`/instances/${id}/stop`, { method: 'POST' }),
   instanceRestart: (id: number) => request(`/instances/${id}/restart`, { method: 'POST' }),
+  instanceAutoStart: (id: number, enabled: boolean) =>
+    request(`/instances/${id}/autostart`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
   instanceStatus: (id: number) => request(`/instances/${id}/status`),
 
   // Instance Spoof IPs
@@ -77,12 +84,12 @@ export const api = {
   testerStatus: () => request('/tester/status'),
   testerStop: () => request('/tester/stop', { method: 'POST' }),
   testerResults: () => request('/tester/results'),
-  testerDownloadUrl: () => `${API_BASE}/tester/download?token=${getToken()}`,
+  testerDownloadUrl: () => `${getApiBase()}/tester/download?token=${getToken()}`,
   testerUpload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     const token = getToken();
-    const res = await fetch(`${API_BASE}/tester/upload`, {
+    const res = await fetch(`${getApiBase()}/tester/upload`, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData,

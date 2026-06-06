@@ -15,6 +15,7 @@ interface Instance {
   recv_transport: string;
   remote_addr?: string;
   client_ip?: string;
+  enabled: boolean;
 }
 
 function formatUptime(seconds: number): string {
@@ -73,6 +74,15 @@ export default function TunnelsPage() {
       alert(e.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleAutoStart = async (id: number, enabled: boolean) => {
+    try {
+      await api.instanceAutoStart(id, enabled);
+      fetchInstances();
+    } catch (e: any) {
+      alert(e.message);
     }
   };
 
@@ -151,12 +161,23 @@ export default function TunnelsPage() {
                     {inst.mode.toUpperCase()}
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                   <span>Send: {inst.send_transport}</span>
                   <span>Recv: {inst.recv_transport}</span>
                   {inst.remote_addr && <span>Remote: {inst.remote_addr}</span>}
                   {inst.client_ip && <span>Client: {inst.client_ip}</span>}
                   {inst.status === "running" && <span style={{ color: "var(--success)" }}>⏱ {formatUptime(inst.uptime)}</span>}
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: inst.enabled ? "var(--success)" : "var(--text-secondary)", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={inst.enabled}
+                      onChange={e => handleAutoStart(inst.id, e.target.checked)}
+                      style={{ width: 14, height: 14, accentColor: "var(--success)", cursor: "pointer" }}
+                    />
+                    AutoStart
+                  </label>
                 </div>
                 {inst.status_error && (
                   <div style={{ fontSize: 12, color: "var(--danger)", marginTop: 4 }}>{inst.status_error}</div>
