@@ -20,7 +20,13 @@ export default function LoginPage() {
       const base = getBasePath();
       window.location.href = base + "/dashboard";
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      const msg = err.message || "Login failed";
+      // Show a user-friendly message for wrong credentials
+      if (msg === "invalid credentials" || msg === "Unauthorized") {
+        setError("Invalid username or password");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

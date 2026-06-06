@@ -19,6 +19,9 @@ export function clearToken() {
   localStorage.removeItem('token');
 }
 
+// Paths that should NOT trigger a redirect on 401 — they handle errors themselves
+const noRedirectOn401 = ['/auth/login', '/auth/setup', '/auth/check'];
+
 async function request(path: string, options: RequestInit = {}): Promise<any> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -32,13 +35,17 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${apiBase}${path}`, { ...options, headers });
   
   if (res.status === 401) {
-    clearToken();
-    if (typeof window !== 'undefined') {
-      // Redirect to login WITH the web-path prefix preserved
-      const base = getBasePath();
-      window.location.href = base + '/login';
+    // For auth endpoints (login/setup/check), don't redirect — let the caller
+    // handle the error so it can show an inline message (e.g. "wrong password")
+    if (!noRedirectOn401.some(p => path.startsWith(p))) {
+      clearToken();
+      if (typeof window !== 'undefined') {
+        // Redirect to login WITH the web-path prefix preserved
+        const base = getBasePath();
+        window.location.href = base + '/login';
+      }
+      throw new Error('Unauthorized');
     }
-    throw new Error('Unauthorized');
   }
   
   const data = await res.json();
