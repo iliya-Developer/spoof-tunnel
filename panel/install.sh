@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # Spoof Panel Installer
-# Usage: bash <(curl -Ls https://raw.githubusercontent.com/ParsaKSH/spoof-tunnel/main/panel/install.sh)
+# Usage: bash <(curl -Ls <ANY_REPO_URL>/panel/install.sh)
+#
+# The script auto-detects which repository it came from, so it works
+# with any fork — just change the URL in the curl command.
 
 set -e
 
@@ -12,7 +15,6 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-REPO="ParsaKSH/spoof-tunnel"
 INSTALL_DIR="/usr/local/bin"
 DATA_DIR="/etc/spoof-panel"
 SERVICE_NAME="spoof-panel"
@@ -29,6 +31,51 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# ── Auto-detect repository ──
+# If the user passes REPO=owner/repo as an env var, use that.
+# Otherwise try to detect from the URL this script was fetched from.
+# As a last resort, ask the user.
+if [ -n "$REPO" ]; then
+    # User explicitly set REPO env var
+    :
+elif [ -n "$INSTALL_REPO_URL" ]; then
+    # Full URL provided — extract owner/repo
+    # e.g. https://github.com/SomeUser/spoof-tunnel → SomeUser/spoof-tunnel
+    REPO=$(echo "$INSTALL_REPO_URL" | sed -E 's|.*github\.com/([^/]+/[^/]+).*|\1|')
+elif [ -n "$0" ] && [ "$0" != "bash" ] && [ "$0" != "/dev/stdin" ]; then
+    # Try to detect from the script's own URL (when run via curl|bash)
+    SCRIPT_URL="${_INSTALL_SOURCE:-}"
+    if [ -z "$SCRIPT_URL" ]; then
+        # Try to extract from the process command line
+        SCRIPT_URL=$(cat /proc/$PPID/cmdline 2>/dev/null | tr '\0' ' ' | grep -oP 'https?://[^ ]+install\.sh' || true)
+    fi
+    if [ -n "$SCRIPT_URL" ]; then
+        REPO=$(echo "$SCRIPT_URL" | sed -E 's|.*github\.com/([^/]+/[^/]+).*|\1|')
+    fi
+fi
+
+# If still not detected, ask the user
+if [ -z "$REPO" ]; then
+    echo -e "${YELLOW}Could not auto-detect the repository.${NC}"
+    echo -e "${YELLOW}Please enter the GitHub repo (owner/repo) or full URL:${NC}"
+    echo -e "${YELLOW}Examples: ParsaKSH/spoof-tunnel  or  https://github.com/YourName/spoof-tunnel${NC}"
+    read -rp "Repository: " REPO_INPUT
+    # Extract owner/repo from whatever the user typed
+    REPO=$(echo "$REPO_INPUT" | sed -E 's|.*github\.com/([^/]+/[^/]+).*|\1|')
+    if [ -z "$REPO" ]; then
+        REPO="$REPO_INPUT"
+    fi
+fi
+
+# Validate REPO format (should be owner/repo)
+if ! echo "$REPO" | grep -qP '^[^/]+/[^/]+$'; then
+    echo -e "${RED}Invalid repository format: ${REPO}${NC}"
+    echo -e "${RED}Expected: owner/repo  (e.g. ParsaKSH/spoof-tunnel)${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Using repository: ${REPO}${NC}"
+
 # Detect architecture
 ARCH=$(uname -m)
 case $ARCH in
@@ -44,7 +91,7 @@ OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 echo -e "${GREEN}Detected: ${OS}/${ARCH}${NC}"
 
 # Get latest release
-echo -e "${YELLOW}Fetching latest release...${NC}"
+echo -e "${YELLOW}Fetching latest release from ${REPO}...${NC}"
 LATEST=$(curl -s "https://api.github.com/repos/${REPO}/releases" | grep -o '"tag_name": *"v[^"]*"' | head -1 | grep -o 'v[^"]*')
 
 if [ -z "$LATEST" ]; then
@@ -53,7 +100,7 @@ if [ -z "$LATEST" ]; then
 fi
 
 if [ -z "$LATEST" ]; then
-    echo -e "${RED}Could not find any releases${NC}"
+    echo -e "${RED}Could not find any releases in ${REPO}${NC}"
     exit 1
 fi
 
@@ -64,6 +111,7 @@ PANEL_URL="https://github.com/${REPO}/releases/download/${LATEST}/spoof-panel-${
 echo -e "${YELLOW}Downloading panel...${NC}"
 curl -Lo /tmp/spoof-panel "${PANEL_URL}" || {
     echo -e "${RED}Download failed!${NC}"
+    echo -e "${RED}URL: ${PANEL_URL}${NC}"
     exit 1
 }
 chmod +x /tmp/spoof-panel
@@ -141,6 +189,7 @@ printf "║  URL:      http://%-30s║\n" "${SERVER_IP}:${PORT}${WEB_PATH}/"
 printf "║  Username: %-38s║\n" "${USERNAME}"
 printf "║  Password: %-38s║\n" "${PASSWORD}"
 printf "║  Web Path: %-38s║\n" "${WEB_PATH}"
+printf "║  Repo:     %-38s║\n" "${REPO}"
 echo "╠══════════════════════════════════════════════════╣"
 echo "║  Service: systemctl status spoof-panel            ║"
 echo "║  Logs:    journalctl -u spoof-panel -f            ║"
