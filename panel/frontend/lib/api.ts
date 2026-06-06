@@ -19,9 +19,28 @@ export function clearToken() {
   localStorage.removeItem('token');
 }
 
-// Paths that should NOT trigger a redirect on 401 — they handle errors themselves
-const noRedirectOn401 = ['/auth/login', '/auth/setup', '/auth/check'];
+/**
+ * authRequest — used ONLY for login/setup/check.
+ * NEVER redirects on 401. Returns the parsed error so the caller
+ * (login page, setup page) can show an inline message.
+ */
+async function authRequest(path: string, options: RequestInit = {}): Promise<any> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options.headers as Record<string, string>) || {}),
+  };
 
+  const apiBase = getApiBase();
+  const res = await fetch(`${apiBase}${path}`, { ...options, headers });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+/**
+ * request — used for all authenticated API calls.
+ * On 401: clears token and redirects to login (preserving web-path).
+ */
 async function request(path: string, options: RequestInit = {}): Promise<any> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -33,33 +52,29 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   // Use dynamic API base so it always reflects the current web-path
   const apiBase = getApiBase();
   const res = await fetch(`${apiBase}${path}`, { ...options, headers });
-  
+
   if (res.status === 401) {
-    // For auth endpoints (login/setup/check), don't redirect — let the caller
-    // handle the error so it can show an inline message (e.g. "wrong password")
-    if (!noRedirectOn401.some(p => path.startsWith(p))) {
-      clearToken();
-      if (typeof window !== 'undefined') {
-        // Redirect to login WITH the web-path prefix preserved
-        const base = getBasePath();
-        window.location.href = base + '/login';
-      }
-      throw new Error('Unauthorized');
+    clearToken();
+    if (typeof window !== 'undefined') {
+      // Redirect to login WITH the web-path prefix preserved
+      const base = getBasePath();
+      window.location.href = base + '/login';
     }
+    throw new Error('Unauthorized');
   }
-  
+
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
 
-// Auth
+// Auth — these use authRequest (NO redirect on wrong password)
 export const api = {
-  checkAuth: () => request('/auth/check'),
+  checkAuth: () => authRequest('/auth/check'),
   login: (username: string, password: string) =>
-    request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    authRequest('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   setup: (username: string, password: string) =>
-    request('/auth/setup', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    authRequest('/auth/setup', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request('/auth/me'),
 
   // Dashboard
