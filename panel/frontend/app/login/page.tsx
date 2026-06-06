@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { api, setToken } from "@/lib/api";
 import { getBasePath } from "@/lib/basepath";
 
 export default function LoginPage() {
@@ -14,24 +15,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Use a direct raw fetch for login — bypasses the 401 redirect
+      // in api.request() so wrong password never causes a page reload.
       const base = getBasePath();
       const apiBase = `${window.location.origin}${base}/api`;
 
-      // Raw fetch with redirect:'manual' — browser will NEVER follow any
-      // server-side redirect. This guarantees no page reload/redirect on
-      // wrong credentials.
       const res = await fetch(`${apiBase}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
-        redirect: "manual",
       });
-
-      // If the server tried to redirect, catch it here
-      if (res.type === "opaqueredirect" || res.status === 0) {
-        setError("Unexpected server redirect. Please try again.");
-        return;
-      }
 
       const data = await res.json();
 
@@ -47,7 +40,7 @@ export default function LoginPage() {
 
       // Success — save token and go to dashboard
       if (data.token) {
-        localStorage.setItem("token", data.token);
+        setToken(data.token);
       }
       window.location.href = base + "/dashboard";
     } catch (err: any) {

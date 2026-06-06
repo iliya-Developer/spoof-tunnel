@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { getBasePath } from "@/lib/basepath";
+import { getBasePath, getLoginUrl } from "@/lib/basepath";
 
 export default function Home() {
   useEffect(() => {
@@ -9,7 +9,7 @@ export default function Home() {
     if (token) {
       window.location.href = base + "/dashboard";
     } else {
-      window.location.href = base + "/login";
+      window.location.href = getLoginUrl();
     }
   }, []);
 

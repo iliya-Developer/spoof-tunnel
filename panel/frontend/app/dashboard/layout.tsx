@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { getBasePath } from "@/lib/basepath";
+import { getBasePath, getLoginUrl } from "@/lib/basepath";
 
 const NAV_ITEMS = [
   { path: "/dashboard", icon: "📊", label: "Dashboard" },
@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) window.location.href = basePath + "/login";
+    if (!token) window.location.href = getLoginUrl();
   }, []);
 
   // Close mobile menu on route change
@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleLogout = () => {
     localStorage.removeItem("token");
-    window.location.href = basePath + "/login";
+    window.location.href = getLoginUrl();
   };
 
   return (

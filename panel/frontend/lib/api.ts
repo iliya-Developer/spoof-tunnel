@@ -1,4 +1,4 @@
-import { getBasePath } from './basepath';
+import { getBasePath, getLoginUrl } from './basepath';
 
 function getApiBase(): string {
   if (typeof window === 'undefined') return '/api';
@@ -19,6 +19,16 @@ export function clearToken() {
   localStorage.removeItem('token');
 }
 
+/**
+ * Redirect to login page, always preserving the web-path.
+ * Uses getLoginUrl() which reads from localStorage as fallback.
+ */
+function redirectToLogin() {
+  if (typeof window !== 'undefined') {
+    window.location.href = getLoginUrl();
+  }
+}
+
 async function request(path: string, options: RequestInit = {}): Promise<any> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -27,16 +37,12 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Use dynamic API base so it always reflects the current web-path
   const apiBase = getApiBase();
   const res = await fetch(`${apiBase}${path}`, { ...options, headers });
 
   if (res.status === 401) {
     clearToken();
-    if (typeof window !== 'undefined') {
-      const base = getBasePath();
-      window.location.href = base + '/login';
-    }
+    redirectToLogin();
     throw new Error('Unauthorized');
   }
 
@@ -45,12 +51,13 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   return data;
 }
 
-// NOTE: login and checkAuth are NOT here — the login page uses raw fetch
-// with redirect:'manual' to prevent any redirect/reload on wrong password.
-// See: app/login/page.tsx
-
 export const api = {
-  // Auth (login/checkAuth handled directly by login page)
+  // Auth
+  login: (username: string, password: string) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  setup: (username: string, password: string) =>
+    request('/auth/setup', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  checkAuth: () => request('/auth/check'),
   me: () => request('/auth/me'),
 
   // Dashboard
