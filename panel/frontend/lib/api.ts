@@ -19,28 +19,6 @@ export function clearToken() {
   localStorage.removeItem('token');
 }
 
-/**
- * authRequest — used ONLY for login/setup/check.
- * NEVER redirects on 401. Returns the parsed error so the caller
- * (login page, setup page) can show an inline message.
- */
-async function authRequest(path: string, options: RequestInit = {}): Promise<any> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...((options.headers as Record<string, string>) || {}),
-  };
-
-  const apiBase = getApiBase();
-  const res = await fetch(`${apiBase}${path}`, { ...options, headers });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
-  return data;
-}
-
-/**
- * request — used for all authenticated API calls.
- * On 401: clears token and redirects to login (preserving web-path).
- */
 async function request(path: string, options: RequestInit = {}): Promise<any> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -56,7 +34,6 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   if (res.status === 401) {
     clearToken();
     if (typeof window !== 'undefined') {
-      // Redirect to login WITH the web-path prefix preserved
       const base = getBasePath();
       window.location.href = base + '/login';
     }
@@ -68,13 +45,12 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   return data;
 }
 
-// Auth — these use authRequest (NO redirect on wrong password)
+// NOTE: login and checkAuth are NOT here — the login page uses raw fetch
+// with redirect:'manual' to prevent any redirect/reload on wrong password.
+// See: app/login/page.tsx
+
 export const api = {
-  checkAuth: () => authRequest('/auth/check'),
-  login: (username: string, password: string) =>
-    authRequest('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  setup: (username: string, password: string) =>
-    authRequest('/auth/setup', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  // Auth (login/checkAuth handled directly by login page)
   me: () => request('/auth/me'),
 
   // Dashboard

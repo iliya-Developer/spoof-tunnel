@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { api, setToken } from "@/lib/api";
 import { getBasePath } from "@/lib/basepath";
 
 export default function LoginPage() {
@@ -13,20 +12,46 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
-      const data = await api.login(username, password);
-      setToken(data.token);
-      // Redirect to dashboard under the web path
       const base = getBasePath();
+      const apiBase = `${window.location.origin}${base}/api`;
+
+      // Raw fetch with redirect:'manual' — browser will NEVER follow any
+      // server-side redirect. This guarantees no page reload/redirect on
+      // wrong credentials.
+      const res = await fetch(`${apiBase}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+        redirect: "manual",
+      });
+
+      // If the server tried to redirect, catch it here
+      if (res.type === "opaqueredirect" || res.status === 0) {
+        setError("Unexpected server redirect. Please try again.");
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const msg = data.error || "Login failed";
+        if (msg === "invalid credentials") {
+          setError("Invalid username or password");
+        } else {
+          setError(msg);
+        }
+        return;
+      }
+
+      // Success — save token and go to dashboard
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
       window.location.href = base + "/dashboard";
     } catch (err: any) {
-      const msg = err.message || "Login failed";
-      // Show a user-friendly message for wrong credentials
-      if (msg === "invalid credentials" || msg === "Unauthorized") {
-        setError("Invalid username or password");
-      } else {
-        setError(msg);
-      }
+      setError(err.message || "Connection error");
     } finally {
       setLoading(false);
     }
