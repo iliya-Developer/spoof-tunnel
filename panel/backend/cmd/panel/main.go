@@ -251,33 +251,64 @@ func runSetup(database *gorm.DB, username, password string, port int) {
         if password == "" {
                 password = auth.GenerateRandomString(12)
         }
-        if port == 0 {
-                port = auth.GenerateRandomPort()
-        }
+
+        // Check if this is a re-setup (user already exists)
+        var userCount int64
+        database.Model(&db.User{}).Count(&userCount)
 
         hash, _ := auth.HashPassword(password)
-        database.Create(&db.User{
-                Username:     username,
-                PasswordHash: hash,
-        })
 
-        database.Create(&db.Setting{Key: "panel_port", Value: fmt.Sprintf("%d", port)})
+        if userCount > 0 {
+                // Re-setup: only update credentials, keep existing port & web-path
+                database.Exec("UPDATE users SET username = ?, password_hash = ?", username, hash)
+        } else {
+                // First setup: create user and generate port if needed
+                database.Create(&db.User{
+                        Username:     username,
+                        PasswordHash: hash,
+                })
+                // Only set port if it doesn't already exist
+                if port != 0 {
+                        getOrCreateSetting(database, "panel_port", func() string {
+                                return fmt.Sprintf("%d", port)
+                        })
+                }
+        }
 
-        // Generate web path if not exists
+        // Always preserve existing port — only generate if never set before
+        listenPort := port
+        if listenPort == 0 {
+                var setting db.Setting
+                if err := database.Where("key = ?", "panel_port").First(&setting).Error; err == nil {
+                        fmt.Sscanf(setting.Value, "%d", &listenPort)
+                }
+        }
+        if listenPort == 0 {
+                listenPort = auth.GenerateRandomPort()
+                database.Create(&db.Setting{Key: "panel_port", Value: fmt.Sprintf("%d", listenPort)})
+        }
+
+        // Always preserve existing web-path — only generate if never set before
         webPath := getOrCreateSetting(database, "web_path", func() string {
                 return auth.GenerateRandomString(10)
         })
 
         fmt.Println()
-        fmt.Println("╔══════════════════════════════════════════════════╗")
-        fmt.Println("║       Spoof Panel — Setup Complete               ║")
-        fmt.Println("╠══════════════════════════════════════════════════╣")
-        fmt.Printf("║  Port:     %-38d║\n", port)
+        if userCount > 0 {
+                fmt.Println("╔══════════════════════════════════════════════════╗")
+                fmt.Println("║     Spoof Panel — Credentials Updated            ║")
+                fmt.Println("╠══════════════════════════════════════════════════╣")
+        } else {
+                fmt.Println("╔══════════════════════════════════════════════════╗")
+                fmt.Println("║       Spoof Panel — Setup Complete               ║")
+                fmt.Println("╠══════════════════════════════════════════════════╣")
+        }
+        fmt.Printf("║  Port:     %-38d║\n", listenPort)
         fmt.Printf("║  Username: %-38s║\n", username)
         fmt.Printf("║  Password: %-38s║\n", password)
         fmt.Printf("║  Web Path: %-38s║\n", "/"+webPath)
         fmt.Println("╠══════════════════════════════════════════════════╣")
-        fmt.Printf("║  URL: http://YOUR_IP:%d/%s/\n", port, webPath)
+        fmt.Printf("║  URL: http://YOUR_IP:%d/%s/\n", listenPort, webPath)
         fmt.Println("╚══════════════════════════════════════════════════╝")
         fmt.Println()
 }
