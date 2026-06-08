@@ -12,7 +12,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-REPO="ParsaKSH/spoof-tunnel"
+REPO="iliya-Developer/spoof-tunnel"
 INSTALL_DIR="/usr/local/bin"
 DATA_DIR="/etc/spoof-panel"
 SERVICE_NAME="spoof-panel"
