@@ -39,7 +39,7 @@ Therefore, a standard unidirectional spoof was insufficient. We required a robus
 
 ## Quick Install (Tunnel Core + GUI Panel):
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ParsaKSH/spoof-tunnel/main/panel/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/iliya-Developer/spoof-tunnel/main/panel/install.sh)
 ```
 
 ## 1. Core Architecture: Mutual IP Spoofing
